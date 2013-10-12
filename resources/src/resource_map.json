@@ -1,0 +1,21 @@
+
+{"friendlyVersion": "1.0",
+ "versionDefName": "APP_RESOURCES",
+ "media": [
+	   {
+	    "type":"png",
+	    "defName":"IMAGE_BACKGROUND",
+	    "file":"images/background.png"
+	   },
+	   {
+	    "type":"png-trans",
+	    "defName":"IMAGE_HAND_LEFT",
+	    "file":"images/hand_left.png"
+	   },
+	   {
+	    "type":"png-trans",
+	    "defName":"IMAGE_HAND_RIGHT",
+	    "file":"images/hand_right.png"
+	   }
+	  ]
+}
