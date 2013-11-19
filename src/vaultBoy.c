@@ -1,12 +1,10 @@
 /*
 VaultBoy - a pebble watchface by Helco
 
-Version: 1.0
+Version: 2.0
 License: GNU GPL v3
 */
-#include "pebble_os.h"
-#include "pebble_app.h"
-#include "pebble_fonts.h"
+#include <pebble.h>
 #include "config.h"
 
 #ifdef INVERTED
@@ -19,109 +17,158 @@ License: GNU GPL v3
 #define NEED_INVERTER
 #endif
 
-#define MY_UUID { 0x63, 0x5D, 0xD4, 0xD3, 0x07, 0x7D, 0x4D, 0x76, 0xA7, 0x57, 0xFC, 0x00, 0x28, 0x8C, 0xF4, 0x91 }
-PBL_APP_INFO(MY_UUID,
-             "Vault Boy", "Helco",
-             1, 0, /* App version */
-             DEFAULT_MENU_ICON,
-             APP_INFO_STANDARD_APP);
+enum ImageIds{
+  IMAGE_BACKGROUND=0,
+  IMAGE_HAND_LEFT_WHITE,
+  IMAGE_HAND_LEFT_BLACK,
+  IMAGE_HAND_RIGHT_WHITE,
+  IMAGE_HAND_RIGHT_BLACK,
+  IMAGE_COUNT
+};
 
-Window window;
-BmpContainer background;
-RotBmpPairContainer leftContainer;
-RotBmpPairContainer rightContainer;
-#define hourLayer leftContainer.layer
-#define minuteLayer rightContainer.layer
+typedef enum {
+  DIRECTION_LEFT=0,
+  DIRECTION_RIGHT=1,
+  DIRECTION_NOT_SET=2,
+} Direction;
+typedef struct {
+  RotBitmapLayer* white;
+  RotBitmapLayer* black;
+  Direction dir;
+} RotBitmapLayerPair;
+
+Window* window;
+GBitmap* images [IMAGE_COUNT];
+BitmapLayer* backgroundLayer;
+Layer* foregroundLayer;
+RotBitmapLayerPair hourLayer={0,0,DIRECTION_NOT_SET};
+RotBitmapLayerPair minuteLayer={0,0,DIRECTION_NOT_SET};
+bool redoLayering=true;
 #ifdef NEED_INVERTER
-InverterLayer inverterLayer;
+InverterLayer* inverterLayer;
 #endif
 
-void setHandDirection (RotBmpPairLayer* layer,bool right) {
-    RotBmpPairContainer* container;
-    if (right)
-        container=&rightContainer;
-    else
-        container=&leftContainer;
-    layer->white_layer.bitmap=&container->white_bmp;
-    layer->black_layer.bitmap=&container->black_bmp;
-    rotbmp_pair_layer_set_src_ic (layer,GPoint((right?9:15),63));
-}
-
-void initHand (RotBmpPairLayer* layer) {
-    //no need to set a hand direction as this is done in handle_time_tick
+void setHandDirection (RotBitmapLayerPair* layer,Direction dir) {
+  if (layer->dir!=dir) {
     GRect frame=GRect(0,0,144,168);
-    layer_set_frame((Layer*)layer,frame);
-    layer_set_frame((Layer*)&layer->white_layer,frame);
-    layer_set_frame((Layer*)&layer->black_layer,frame);
-    GPoint dest_ic=GPoint(144/2,168/2);
-    layer->white_layer.dest_ic=dest_ic;
-    layer->black_layer.dest_ic=dest_ic;
+    GPoint src_ic=GPoint((dir==DIRECTION_RIGHT?9:15),63);
+    redoLayering=true;
+    layer->dir=dir;
+
+    if (layer->white!=0)
+      rot_bitmap_layer_destroy(layer->white);
+    layer->white=rot_bitmap_layer_create (images[dir==DIRECTION_RIGHT?IMAGE_HAND_RIGHT_WHITE:IMAGE_HAND_LEFT_WHITE]);
+    layer_set_frame((Layer*)layer->white,frame);
+    rot_bitmap_set_compositing_mode(layer->white,GCompOpOr);
+    rot_bitmap_set_src_ic (layer->white,src_ic);
+
+    if (layer->black!=0)
+      rot_bitmap_layer_destroy(layer->black);
+    layer->black=rot_bitmap_layer_create (images[dir==DIRECTION_RIGHT?IMAGE_HAND_RIGHT_BLACK:IMAGE_HAND_LEFT_BLACK]);
+    layer_set_frame((Layer*)layer->black,frame);
+    rot_bitmap_set_compositing_mode(layer->black,GCompOpClear);
+    rot_bitmap_set_src_ic (layer->black,src_ic);
+  }
 }
-
-void handle_time_tick (AppContextRef app,PebbleTickEvent* event) {
-    //update minute hand
-    setHandDirection (&minuteLayer,event->tick_time->tm_min<=30);
-    rotbmp_pair_layer_set_angle(&minuteLayer,event->tick_time->tm_min*TRIG_MAX_ANGLE/60);
-    layer_mark_dirty((Layer*)&minuteLayer);
-
-    //update hour hand
-    if (event->tick_time->tm_hour>=12)
-        event->tick_time->tm_hour-=12;
-    setHandDirection (&hourLayer,event->tick_time->tm_hour<=6);
-    rotbmp_pair_layer_set_angle(&hourLayer,event->tick_time->tm_min*TRIG_MAX_ANGLE/720+event->tick_time->tm_hour*TRIG_MAX_ANGLE/12);
-    layer_mark_dirty((Layer*)&hourLayer);
-
-#ifdef NIGHT_INDICATOR
-    bool inverted=true;
-    if (event->tick_time->tm_hour>=DAY_START&&
-        event->tick_time->tm_hour<=DAY_END)
-        inverted=false;
-    layer_set_hidden((Layer*)&inverterLayer,INVERTED_OP inverted);
+void setHandRotation (RotBitmapLayerPair* layer,int32_t rot) {
+  rot_bitmap_layer_set_angle (layer->white,rot);
+  rot_bitmap_layer_set_angle (layer->black,rot);
+}
+void markHandDirty (RotBitmapLayerPair* layer) {
+  layer_mark_dirty((Layer*)layer->white);
+  layer_mark_dirty((Layer*)layer->black);
+}
+void destroyHand (RotBitmapLayerPair* layer) {
+  rot_bitmap_layer_destroy(layer->white);
+  rot_bitmap_layer_destroy(layer->black);
+}
+void setupLayers () {
+  redoLayering=false;
+  Layer* rootLayer=window_get_root_layer(window);
+  layer_remove_child_layers(rootLayer);
+  layer_add_child(rootLayer,(Layer*)backgroundLayer);
+  layer_add_child(rootLayer,(Layer*)hourLayer.white);
+  layer_add_child(rootLayer,(Layer*)hourLayer.black);
+  layer_add_child(rootLayer,(Layer*)minuteLayer.white);
+  layer_add_child(rootLayer,(Layer*)minuteLayer.black);
+  layer_add_child(rootLayer,foregroundLayer);
+#ifdef NEED_INVERTER
+  layer_add_child(rootLayer,(Layer*)inverterLayer);
 #endif
 }
-    //rotbmp_pair_layer_set_angle(&layer,segment*TRIG_MAX_ANGLE/60);
 
-void handle_init(AppContextRef ctx) {
-    window_init(&window, "Vault Boy");
-    window_stack_push(&window, true /* Animated */);
+void update_foreground_layer (Layer* me,GContext* ctx) {
+  graphics_context_set_fill_color(ctx,GColorBlack);
+  graphics_fill_circle(ctx,GPoint(144/2,168/2),4);
+}
 
-    bmp_init_container (RESOURCE_ID_IMAGE_BACKGROUND,&background);
-    layer_add_child (&window.layer,(Layer*)&background.layer);
+void handle_time_tick (struct tm* tick_time,TimeUnits units_changed) {
+#ifdef NIGHT_INDICATOR
+  bool inverted=true;
+  if (tick_time->tm_hour>=DAY_START&&tick_time->tm_hour<=DAY_END)
+    inverted=false;
+  layer_set_hidden((Layer*)inverterLayer,INVERTED_OP inverted);
+#endif
 
-    rotbmp_pair_init_container(RESOURCE_ID_IMAGE_HAND_LEFT_WHITE,RESOURCE_ID_IMAGE_HAND_LEFT_BLACK,&leftContainer);
-    rotbmp_pair_init_container(RESOURCE_ID_IMAGE_HAND_RIGHT_WHITE,RESOURCE_ID_IMAGE_HAND_RIGHT_BLACK,&rightContainer);
-    initHand (&hourLayer);
-    layer_add_child (&window.layer,(Layer*)&hourLayer);
-    initHand (&minuteLayer);
-    layer_add_child (&window.layer,(Layer*)&minuteLayer);
+  //update minute hand
+  setHandDirection (&minuteLayer,tick_time->tm_min<=30);
+  setHandRotation(&minuteLayer,tick_time->tm_min*TRIG_MAX_ANGLE/60);
+  markHandDirty(&minuteLayer);
+
+  //update hour hand
+  if (tick_time->tm_hour>=12)
+    tick_time->tm_hour-=12;
+  setHandDirection (&hourLayer,tick_time->tm_hour<=6);
+  setHandRotation(&hourLayer,tick_time->tm_min*TRIG_MAX_ANGLE/720+tick_time->tm_hour*TRIG_MAX_ANGLE/12);
+  markHandDirty(&hourLayer);
+
+  if (redoLayering)
+    setupLayers ();
+}
+
+void handle_init() {
+  window=window_create();
+
+  images[IMAGE_BACKGROUND]=gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND);
+  images[IMAGE_HAND_LEFT_WHITE]=gbitmap_create_with_resource(RESOURCE_ID_IMAGE_HAND_LEFT_WHITE);
+  images[IMAGE_HAND_LEFT_BLACK]=gbitmap_create_with_resource(RESOURCE_ID_IMAGE_HAND_LEFT_BLACK);
+  images[IMAGE_HAND_RIGHT_WHITE]=gbitmap_create_with_resource(RESOURCE_ID_IMAGE_HAND_RIGHT_WHITE);
+  images[IMAGE_HAND_RIGHT_BLACK]=gbitmap_create_with_resource(RESOURCE_ID_IMAGE_HAND_RIGHT_BLACK);
+
+  backgroundLayer=bitmap_layer_create(GRect(0,0,144,168));
+  bitmap_layer_set_bitmap(backgroundLayer,images[IMAGE_BACKGROUND]);
+  foregroundLayer=layer_create(GRect(0,0,144,168));
+  layer_set_update_proc(foregroundLayer,update_foreground_layer);
 
 #ifdef NEED_INVERTER
-    inverter_layer_init (&inverterLayer,layer_get_frame(&window.layer));
-    layer_add_child (&window.layer,(Layer*)&inverterLayer);
+  inverterLayer=inverter_layer_create (GRect(0,0,144,168));
 #endif
 
-    //trigger the first draw
-    PebbleTickEvent tickEvent;
-    PblTm time;
-    get_time(&time);
-    tickEvent.tick_time=&time;
-    handle_time_tick(ctx,&tickEvent);
+  window_stack_push(window, true /* Animated */);
+
+  //trigger the first draw
+  time_t timeSec=time(0);
+  struct tm* time=localtime(&timeSec);
+  handle_time_tick(time,0);
+  tick_timer_service_subscribe(MINUTE_UNIT,handle_time_tick);
 }
 
-void handle_deinit (AppContextRef ctx) {
-    bmp_deinit_container (&background);
-    rotbmp_pair_deinit_container (&leftContainer);
-    rotbmp_pair_deinit_container (&rightContainer);
+void handle_deinit () {
+  for (int i=0;i<IMAGE_COUNT;i++)
+    gbitmap_destroy(images[i]);
+  bitmap_layer_destroy(backgroundLayer);
+  layer_destroy(foregroundLayer);
+  destroyHand (&hourLayer);
+  destroyHand (&minuteLayer);
+#ifdef NEED_INVERTER
+  inverter_layer_destroy(inverterLayer);
+#endif
+  window_destroy(window);
 }
 
-void pbl_main(void *params) {
-    PebbleAppHandlers handlers = {
-        .init_handler = &handle_init,
-        .deinit_handler = &handle_deinit,
-
-        .tick_info={
-            .tick_handler=&handle_time_tick
-        }
-    };
-    app_event_loop(params, &handlers);
+int main (void) {
+  handle_init ();
+  app_event_loop();
+  handle_deinit();
+  return 0;
 }

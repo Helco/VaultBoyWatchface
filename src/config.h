@@ -1,7 +1,7 @@
 /*
 VaultBoy - a pebble watchface by Helco
 
-Version: 1.0
+Version: 2.0
 License: GNU GPL v3
 
 Confg:
