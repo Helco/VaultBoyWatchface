@@ -4,9 +4,9 @@
   "longName": "Vault Boy",
   "companyName": "Helco",
   "versionCode": 2,
-  "versionLabel": "2.0.0",
+  "versionLabel": "2.0",
   "watchapp": {
-    "watchface": false
+    "watchface": true
   },
   "appKeys": {
     "dummy": 0

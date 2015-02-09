@@ -52,22 +52,39 @@ void setHandDirection (RotBitmapLayerPair* layer,Direction dir) {
   if (layer->dir!=dir) {
     GRect frame=GRect(0,0,144,168);
     GPoint src_ic=GPoint((dir==DIRECTION_RIGHT?9:15),63);
+    GBitmap* imageWhite, *imageBlack;
     redoLayering=true;
     layer->dir=dir;
 
-    if (layer->white!=0)
+    if (dir == DIRECTION_RIGHT) {
+      imageWhite = images[IMAGE_HAND_RIGHT_WHITE];
+      imageBlack = images[IMAGE_HAND_RIGHT_BLACK];
+    }
+    else {
+      imageWhite = images[IMAGE_HAND_LEFT_WHITE];
+      imageBlack = images[IMAGE_HAND_LEFT_BLACK];
+    }
+
+    if (layer->white != 0)
       rot_bitmap_layer_destroy(layer->white);
-    layer->white=rot_bitmap_layer_create (images[dir==DIRECTION_RIGHT?IMAGE_HAND_RIGHT_WHITE:IMAGE_HAND_LEFT_WHITE]);
-    layer_set_frame((Layer*)layer->white,frame);
+    layer->white=rot_bitmap_layer_create (imageWhite);
     rot_bitmap_set_compositing_mode(layer->white,GCompOpOr);
     rot_bitmap_set_src_ic (layer->white,src_ic);
+    frame = layer_get_frame((Layer*)layer->white);
+    frame.origin.x = 144/2 - frame.size.w/2;
+    frame.origin.y = 168/2 - frame.size.h/2;
+    layer_set_frame((Layer*)layer->white,frame);
+    
 
     if (layer->black!=0)
       rot_bitmap_layer_destroy(layer->black);
-    layer->black=rot_bitmap_layer_create (images[dir==DIRECTION_RIGHT?IMAGE_HAND_RIGHT_BLACK:IMAGE_HAND_LEFT_BLACK]);
-    layer_set_frame((Layer*)layer->black,frame);
+    layer->black=rot_bitmap_layer_create (imageBlack);
     rot_bitmap_set_compositing_mode(layer->black,GCompOpClear);
     rot_bitmap_set_src_ic (layer->black,src_ic);
+    frame = layer_get_frame((Layer*)layer->black);
+    frame.origin.x = 144/2 - frame.size.w/2;
+    frame.origin.y = 168/2 - frame.size.h/2;
+    layer_set_frame((Layer*)layer->black,frame);
   }
 }
 void setHandRotation (RotBitmapLayerPair* layer,int32_t rot) {
