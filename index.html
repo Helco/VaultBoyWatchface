@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>VaultBoy Configuration</title>
+  <link rel='stylesheet' type='text/css' href='css/slate.min.css'>
+  <script src='js/slate.min.js'></script>
+  <style>
+    .title {
+      padding: 15px 10px;
+      text-transform: uppercase;
+      font-family: 'PT Sans', sans-serif;
+      font-size: 1.2em;
+      font-weight: 500;
+      color: #888888;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <h1 class='title'>VaultBoy Configuration</h1>
+
+  <div class='item-container'>
+    <div class='item-container-header'>General</div>
+    <div class='item-container-content'>
+      <label class='item'>
+        Inverted
+        <input id='inverted_checkbox' type='checkbox' class='item-toggle'>
+        <input id='ni_enabled_checkbox' type='checkbox' class='item-toggle'>
+      </label>
+    </div>
+    <div class='item-container-footer'>
+      If inverted, most of the screen will be black instead of the default white.
+    </div>
+  </div>
+
+  <div class='item-container'>
+    <div class='item-container-header'>Night-Indicator Day Range</div>
+    <div class='item-container-content'>
+      <label class="item">
+        <input type="range" class="item-slider" name="ni_dayStart_slider" id="ni_dayStart_slider" value="8" min="0" max="23">
+        <div class="item-input-wrapper item-slider-text">
+          <input type="text" class="item-input" name="ni_dayStart_slider" value="8">
+        </div>
+      </label>
+      <label class="item">
+        <input type="range" class="item-slider" name="ni_dayEnd_slider" id="ni_dayEnd_slider" value="20" min="0" max="23">
+        <div class="item-input-wrapper item-slider-text">
+          <input type="text" class="item-input" name="ni_dayEnd_slider" value="8">
+        </div>
+      </label>
+    </div>
+    <div class='item-container-footer'>
+      This tells the night indicator when it is day. The night indicator, if enabled, will invert the screen in that range.
+    </div>
+  </div>
+
+  <div class='item-container'>
+    <div class='button-container'>
+      <input id='submit_button' type='button' class='item-button' value='SUBMIT'>
+    </div>
+  </div>
+</body>
+<script>
+  var submitButton = document.getElementById('submit_button');
+  submitButton.addEventListener('click', function() {
+    function e(n) { return document.getElementById(n); }
+    var config = {
+      "inverted": e("inverted_checkbox").value,
+      "nightIndicator": e("ni_enabled_checkbox").value,
+      "dayStart": e("ni_dayStart_slider").value,
+      "dayEnd": e("ni_dayEnd_slider").value
+    };
+    document.location.href = "pebblejs://close#" + encodeURIComponent(JSON.stringify(config));
+  });
+
+</script>
+
+</html>
