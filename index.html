@@ -66,6 +66,18 @@
   </div>
 </body>
 <script>
+  function getQueryParam(variable, defaultValue) {
+    var query = location.search.substring(1);
+    var vars = query.split('&');
+    for (var i = 0; i < vars.length; i++) {
+      var pair = vars[i].split('=');
+      if (pair[0] === variable) {
+        return decodeURIComponent(pair[1]);
+      }
+    }
+    return defaultValue || false;
+  }
+  
   var submitButton = document.getElementById('submit_button');
   submitButton.addEventListener('click', function() {
     function e(n) { return document.getElementById(n); }
@@ -75,7 +87,8 @@
       "dayStart": e("ni_dayStart_slider").value,
       "dayEnd": e("ni_dayEnd_slider").value
     };
-    document.location.href = "pebblejs://close#" + encodeURIComponent(JSON.stringify(config));
+    var return_to = getQueryParam('return_to', 'pebblejs://close#');
+    document.location.href = return_to + encodeURIComponent(JSON.stringify(config));
   });
 
 </script>
